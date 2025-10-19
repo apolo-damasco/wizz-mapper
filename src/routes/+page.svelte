@@ -56,7 +56,7 @@
 
     let pdfString = $state("");
 
-    const flights = $derived(parseWizzSchedule(exampleData));
+    const flights = $derived(parseWizzSchedule(pdfString));
 </script>
 
 <div class="flex flex-col gap-4 my-5 max-w-2xl mx-auto">
