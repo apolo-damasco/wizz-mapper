@@ -185,7 +185,6 @@
                     <Table.Row>
                         <Table.Cell class="font-medium">
                             {flight.from}
-                            {flight.departure}
                             <Badge variant="default">
                                 {format(addHours(departure, -2), "EEE HH:mm")}
                             </Badge>
@@ -203,7 +202,6 @@
                             {@const arrival = new Date(flight.arrival)}
                             <Table.Cell class="font-medium">
                                 {flight.from}
-                                {flight.departure}
                                 <Badge variant="default">
                                     {format(
                                         addHours(departure, -2),
@@ -248,6 +246,3 @@
         </Empty.Root>
     {/if}
 </div>
-
-<pre>{JSON.stringify(flights, null, 2)}</pre>
-<pre>{JSON.stringify(pdfString, null, 2)}</pre>
