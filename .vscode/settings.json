@@ -1,0 +1,18 @@
+{
+	"files.associations": {
+		"wrangler.json": "jsonc"
+	},
+	"editor.formatOnSave": false,
+	"editor.defaultFormatter": "biomejs.biome",
+	"[svelte]": {
+		"editor.defaultFormatter": "svelte.svelte-vscode"
+	},
+	"editor.wordWrap": "on",
+	"recommendations": [
+		"svelte.svelte-vscode",
+		"biomejs.biome"
+	],
+	"editor.codeActionsOnSave": {
+		"source.organizeImports.biome": "explicit"
+	}
+}
