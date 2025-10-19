@@ -1,8 +1,10 @@
 <script lang="ts">
-    import { type Flight, parseWizzSchedule } from "../lib/data-parser";
+    import { Button } from "$lib/components/ui/button";
+    import { Input } from "$lib/components/ui/input";
+    import { parseWizzSchedule } from "../lib/data-parser";
+    import { type FlightSearchResult, findFlights } from "../lib/flight-search";
     import AirportSelection from "./airport-selection.svelte";
     import { exampleData } from "./example-data";
-
 
     const flights = parseWizzSchedule(exampleData);
 
@@ -20,24 +22,45 @@
         return params;
     });
 
-    type Result = {
-        connections: Flight[];
-    };
+    let flightSearchResults: FlightSearchResult | null = $state(null);
 
-    const results: Result[] = $derived.by(() => {
+    function findResults() {
         if (missingParams.length > 0) {
-            return [];
+            return null;
         }
-        return [];
-    });
+        flightSearchResults = findFlights(
+            flights,
+            selectedOrigin,
+            selectedDestination,
+        );
+    }
+
+    let maxFlights = $state(1);
 </script>
 
+<div class="flex flex-col gap-4 my-5 max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold">Wizz Mapper</h1>
 
-<div class="flex flex-col gap-4  my-5 max-w-2xl mx-auto">
-    <h1 class="text-2xl font-bold"  >Wizz Mapper</h1>
-    
-    <AirportSelection flights={flights} bind:selectedAirport={selectedOrigin} placeholder="Select origin..." />
-    <AirportSelection flights={flights} bind:selectedAirport={selectedDestination} placeholder="Select destination..." />
+    <AirportSelection
+        {flights}
+        bind:selectedAirport={selectedOrigin}
+        placeholder="Select origin..."
+    />
+    <AirportSelection
+        {flights}
+        bind:selectedAirport={selectedDestination}
+        placeholder="Select destination..."
+    />
 
-    <pre>{JSON.stringify(results, null, 2)}</pre>
+    <Input
+        type="number"
+        min={1}
+        max={10}
+        bind:value={maxFlights}
+        placeholder="Max flights"
+    />
+
+    <Button variant="outline" onclick={findResults}>Find flights</Button>
+
+    <pre>{JSON.stringify(flightSearchResults, null, 2)}</pre>
 </div>
