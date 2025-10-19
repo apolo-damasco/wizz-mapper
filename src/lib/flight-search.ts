@@ -3,159 +3,173 @@ import type { Flight } from "./data-parser";
 export type FlightItinerary = Flight[];
 
 export type FlightSearchResult = {
-    direct: Flight[];
-    connecting: FlightItinerary[];
+  direct: Flight[];
+  connecting: FlightItinerary[];
 };
 
 const MIN_LAYOVER_MS = 60 * 60 * 1000;
-const MAX_LEGS = 3;
+const DEFAULT_MAX_CONNECTIONS = 2;
+const MAX_ALLOWED_CONNECTIONS = 4;
 
 type TimedFlight = {
-    flight: Flight;
-    departureMs: number;
-    arrivalMs: number;
+  flight: Flight;
+  departureMs: number;
+  arrivalMs: number;
 };
 
 const now =
-    typeof performance !== "undefined" && typeof performance.now === "function"
-        ? () => performance.now()
-        : () => Date.now();
+  typeof performance !== "undefined" && typeof performance.now === "function"
+    ? () => performance.now()
+    : () => Date.now();
 
 function parseTime(value: string): number {
-    const timestamp = Date.parse(value);
-    if (Number.isNaN(timestamp)) {
-        throw new Error(`Invalid date string received: ${value}`);
-    }
-    return timestamp;
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    throw new Error(`Invalid date string received: ${value}`);
+  }
+  return timestamp;
 }
 
 export function findFlights(
-    flights: Flight[],
-    origin: string,
-    destination: string,
+  flights: Flight[],
+  origin: string,
+  destination: string,
+  options: {
+    maxConnections?: number;
+    showUnavaliableFlights?: boolean;
+  } = {},
 ): FlightSearchResult {
-    const startTs = now();
-    console.log(
-        `[findFlights] start origin="${origin}" destination="${destination}" candidates=${flights.length}`,
-    );
+  const requestedConnections =
+    options.maxConnections ?? DEFAULT_MAX_CONNECTIONS;
+  const maxConnections = Math.max(
+    0,
+    Math.min(requestedConnections, MAX_ALLOWED_CONNECTIONS),
+  );
+  const maxLegs = maxConnections + 1;
 
-    const flightsByOrigin = new Map<string, TimedFlight[]>();
-    const flightTimes = new Map<Flight, TimedFlight>();
+  const startTs = now();
+  console.log(
+    `[findFlights] start origin="${origin}" destination="${destination}" candidates=${flights.length} maxConnections=${maxConnections} showUnavaliableFlights=${options.showUnavaliableFlights}`,
+  );
 
-    for (const flight of flights) {
-        const items = flightsByOrigin.get(flight.from);
-        const timedFlight: TimedFlight = {
-            flight,
-            departureMs: parseTime(flight.departure),
-            arrivalMs: parseTime(flight.arrival),
-        };
-        flightTimes.set(flight, timedFlight);
-        if (items) items.push(timedFlight);
-        else flightsByOrigin.set(flight.from, [timedFlight]);
-    }
+  const flightsByOrigin = new Map<string, TimedFlight[]>();
+  const flightTimes = new Map<Flight, TimedFlight>();
 
-    for (const [, items] of flightsByOrigin) {
-        items.sort((a, b) => a.departureMs - b.departureMs);
-    }
+  const filteredFlights = options.showUnavaliableFlights
+    ? flights
+    : flights.filter((flight) => flight.availability === "Available");
 
-    const directFlights = (flightsByOrigin.get(origin) ?? [])
-        .filter((item) => item.flight.to === destination)
-        .map((item) => item.flight);
+  for (const flight of filteredFlights) {
+    const items = flightsByOrigin.get(flight.from);
+    const timedFlight: TimedFlight = {
+      flight,
+      departureMs: parseTime(flight.departure),
+      arrivalMs: parseTime(flight.arrival),
+    };
+    flightTimes.set(flight, timedFlight);
+    if (items) items.push(timedFlight);
+    else flightsByOrigin.set(flight.from, [timedFlight]);
+  }
 
-    let evaluatedLegs = 0;
+  for (const [, items] of flightsByOrigin) {
+    items.sort((a, b) => a.departureMs - b.departureMs);
+  }
 
-    const connectingFlights: FlightItinerary[] = [];
-    const visitedAirports = new Set<string>([origin]);
+  const directFlights = (flightsByOrigin.get(origin) ?? [])
+    .filter((item) => item.flight.to === destination)
+    .map((item) => item.flight);
 
-    const explore = (
-        currentAirport: string,
-        path: TimedFlight[],
-    ): void => {
-        if (path.length >= MAX_LEGS) return;
-        const options = flightsByOrigin.get(currentAirport);
-        if (!options) return;
+  let evaluatedLegs = 0;
 
-        for (const timed of options) {
-            evaluatedLegs++;
-            const { flight, departureMs, arrivalMs } = timed;
+  const connectingFlights: FlightItinerary[] = [];
+  const visitedAirports = new Set<string>([origin]);
 
-            if (path.some((segment) => segment.flight === flight)) {
-                continue;
-            }
+  const explore = (currentAirport: string, path: TimedFlight[]): void => {
+    if (path.length >= maxLegs) return;
+    const options = flightsByOrigin.get(currentAirport);
+    if (!options) return;
 
-            const lastArrival =
-                path.length > 0 ? path[path.length - 1].arrivalMs : null;
+    for (const timed of options) {
+      evaluatedLegs++;
+      const { flight, departureMs } = timed;
 
-            if (
-                lastArrival !== null &&
-                departureMs < lastArrival + MIN_LAYOVER_MS
-            ) {
-                continue;
-            }
+      if (path.some((segment) => segment.flight === flight)) {
+        continue;
+      }
 
-            const isDestination = flight.to === destination;
-            const alreadyVisited = visitedAirports.has(flight.to);
+      const lastArrival =
+        path.length > 0 ? path[path.length - 1].arrivalMs : null;
 
-            if (!isDestination && alreadyVisited) {
-                continue;
-            }
+      if (lastArrival !== null && departureMs < lastArrival + MIN_LAYOVER_MS) {
+        continue;
+      }
 
-            path.push(timed);
+      const isDestination = flight.to === destination;
+      const alreadyVisited = visitedAirports.has(flight.to);
 
-            if (!isDestination && !alreadyVisited) {
-                visitedAirports.add(flight.to);
-            }
+      if (!isDestination && alreadyVisited) {
+        continue;
+      }
 
-            if (isDestination) {
-                if (path.length > 1) {
-                    connectingFlights.push(path.map((segment) => segment.flight));
-                }
-            } else {
-                explore(flight.to, path);
-            }
+      path.push(timed);
 
-            path.pop();
+      if (!isDestination && !alreadyVisited) {
+        visitedAirports.add(flight.to);
+      }
 
-            if (!isDestination && !alreadyVisited) {
-                visitedAirports.delete(flight.to);
-            }
+      if (isDestination) {
+        if (path.length > 1) {
+          connectingFlights.push(path.map((segment) => segment.flight));
         }
-    };
+      } else {
+        explore(flight.to, path);
+      }
 
-    explore(origin, []);
+      path.pop();
 
-    const compareItineraries = (a: FlightItinerary, b: FlightItinerary): number => {
-        // biome-ignore lint/style/noNonNullAssertion: <explanation>
-        const aStart = flightTimes.get(a[0])!.departureMs;
-        // biome-ignore lint/style/noNonNullAssertion: <explanation>
-        const bStart = flightTimes.get(b[0])!.departureMs;
-        if (aStart !== bStart) return aStart - bStart;
+      if (!isDestination && !alreadyVisited) {
+        visitedAirports.delete(flight.to);
+      }
+    }
+  };
 
-        // biome-ignore lint/style/noNonNullAssertion: <explanation>
-        const aEnd = flightTimes.get(a[a.length - 1])!.arrivalMs;
-        // biome-ignore lint/style/noNonNullAssertion: <explanation>
-        const bEnd = flightTimes.get(b[b.length - 1])!.arrivalMs;
-        if (aEnd !== bEnd) return aEnd - bEnd;
+  explore(origin, []);
 
-        return a.length - b.length;
-    };
+  const compareItineraries = (
+    a: FlightItinerary,
+    b: FlightItinerary,
+  ): number => {
+    // biome-ignore lint/style/noNonNullAssertion: <explanation>
+    const aStart = flightTimes.get(a[0])!.departureMs;
+    // biome-ignore lint/style/noNonNullAssertion: <explanation>
+    const bStart = flightTimes.get(b[0])!.departureMs;
+    if (aStart !== bStart) return aStart - bStart;
 
-    connectingFlights.sort(compareItineraries);
-    directFlights.sort(
-        (a, b) =>
-            // biome-ignore lint/style/noNonNullAssertion: <explanation>
-            flightTimes.get(a)!.departureMs - flightTimes.get(b)!.departureMs,
-    );
+    // biome-ignore lint/style/noNonNullAssertion: <explanation>
+    const aEnd = flightTimes.get(a[a.length - 1])!.arrivalMs;
+    // biome-ignore lint/style/noNonNullAssertion: <explanation>
+    const bEnd = flightTimes.get(b[b.length - 1])!.arrivalMs;
+    if (aEnd !== bEnd) return aEnd - bEnd;
 
-    const elapsed = now() - startTs;
-    console.log(
-        `[findFlights] end origin="${origin}" destination="${destination}" direct=${directFlights.length} connecting=${connectingFlights.length} evaluatedLegs=${evaluatedLegs} elapsedMs=${elapsed.toFixed(
-            2,
-        )}`,
-    );
+    return a.length - b.length;
+  };
 
-    return {
-        direct: directFlights,
-        connecting: connectingFlights,
-    };
+  connectingFlights.sort(compareItineraries);
+  directFlights.sort(
+    (a, b) =>
+      // biome-ignore lint/style/noNonNullAssertion: <explanation>
+      flightTimes.get(a)!.departureMs - flightTimes.get(b)!.departureMs,
+  );
+
+  const elapsed = now() - startTs;
+  console.log(
+    `[findFlights] end origin="${origin}" destination="${destination}" direct=${directFlights.length} connecting=${connectingFlights.length} evaluatedLegs=${evaluatedLegs} elapsedMs=${elapsed.toFixed(
+      2,
+    )}`,
+  );
+
+  return {
+    direct: directFlights,
+    connecting: connectingFlights,
+  };
 }

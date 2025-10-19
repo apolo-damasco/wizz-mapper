@@ -2,7 +2,7 @@
 	"files.associations": {
 		"wrangler.json": "jsonc"
 	},
-	"editor.formatOnSave": false,
+	"editor.formatOnSave": true,
 	"editor.defaultFormatter": "biomejs.biome",
 	"[svelte]": {
 		"editor.defaultFormatter": "svelte.svelte-vscode"
@@ -15,4 +15,5 @@
 	"editor.codeActionsOnSave": {
 		"source.organizeImports.biome": "explicit"
 	}
+
 }
