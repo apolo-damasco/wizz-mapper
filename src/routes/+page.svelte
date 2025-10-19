@@ -1,20 +1,16 @@
 <script lang="ts">
-    import { Badge } from "$lib/components/ui/badge";
     import { Button } from "$lib/components/ui/button";
     import { Checkbox } from "$lib/components/ui/checkbox/index.js";
     import * as Empty from "$lib/components/ui/empty/index.js";
     import * as Field from "$lib/components/ui/field/index.js";
     import { Input } from "$lib/components/ui/input";
-    import { Label } from "$lib/components/ui/label";
-    import * as Select from "$lib/components/ui/select/index.js";
-    import * as Table from "$lib/components/ui/table/index.js";
     import { Textarea } from "$lib/components/ui/textarea/index.js";
-    import { addHours, format } from "date-fns";
     import { queryParameters } from "sveltekit-search-params";
     import { parseWizzSchedule } from "../lib/data-parser";
     import { type FlightSearchResult, findFlights } from "../lib/flight-search";
     import AirportSelection from "./airport-selection.svelte";
     import { exampleData } from "./example-data";
+    import ResultsTable from "./results-table.svelte";
 
     const queryParams = queryParameters({
         origin: true,
@@ -60,7 +56,7 @@
 
     let pdfString = $state("");
 
-    const flights = $derived(parseWizzSchedule(pdfString));
+    const flights = $derived(parseWizzSchedule(exampleData));
 </script>
 
 <div class="flex flex-col gap-4 my-5 max-w-2xl mx-auto">
@@ -171,65 +167,7 @@
 </div>
 <div class="border my-4 rounded mx-4">
     {#if flightSearchResults}
-        <Table.Root>
-            <Table.Header>
-                <Table.Row>
-                    <Table.Head>First connection</Table.Head>
-                    <Table.Head>Second connection</Table.Head>
-                </Table.Row>
-            </Table.Header>
-            <Table.Body>
-                {#each flightSearchResults.direct as flight (flight)}
-                    {@const departure = new Date(flight.departure)}
-                    {@const arrival = new Date(flight.arrival)}
-                    <Table.Row>
-                        <Table.Cell class="font-medium">
-                            {flight.from}
-                            <Badge variant="default">
-                                {format(addHours(departure, -2), "EEE HH:mm")}
-                            </Badge>
-                            -> {flight.to}
-                            <Badge variant="default">
-                                {format(addHours(arrival, -2), " EEE HH:mm")}
-                            </Badge>
-                        </Table.Cell>
-                    </Table.Row>
-                {/each}
-                {#each flightSearchResults.connecting as itinerary (itinerary)}
-                    <Table.Row>
-                        {#each itinerary as flight (flight)}
-                            {@const departure = new Date(flight.departure)}
-                            {@const arrival = new Date(flight.arrival)}
-                            <Table.Cell class="font-medium">
-                                {flight.from}
-                                <Badge variant="default">
-                                    {format(
-                                        addHours(departure, -2),
-                                        " EEE HH:mm",
-                                    )}
-                                </Badge>
-                                -> {flight.to}
-                                <Badge variant="default">
-                                    {format(
-                                        addHours(arrival, -2),
-                                        " EEE HH:mm",
-                                    )}
-                                </Badge>
-                            </Table.Cell>
-                        {/each}
-                    </Table.Row>
-                {/each}
-            </Table.Body>
-            <Table.Footer>
-                <Table.Row>
-                    <Table.Cell colspan={3}>Total</Table.Cell>
-                    <Table.Cell class="text-right">
-                        {flightSearchResults.direct.length} direct flights
-                        {flightSearchResults.connecting.length} connecting flights</Table.Cell
-                    >
-                </Table.Row>
-            </Table.Footer>
-        </Table.Root>
+        <ResultsTable {flightSearchResults} />
     {:else}
         <Empty.Root>
             <Empty.Header>

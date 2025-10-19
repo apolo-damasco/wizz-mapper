@@ -2,10 +2,7 @@ import type { Flight } from "./data-parser";
 
 export type FlightItinerary = Flight[];
 
-export type FlightSearchResult = {
-  direct: Flight[];
-  connecting: FlightItinerary[];
-};
+export type FlightSearchResult = FlightItinerary[];
 
 const MIN_LAYOVER_MS = 60 * 60 * 1000;
 const DEFAULT_MAX_CONNECTIONS = 2;
@@ -154,22 +151,18 @@ export function findFlights(
     return a.length - b.length;
   };
 
-  connectingFlights.sort(compareItineraries);
-  directFlights.sort(
-    (a, b) =>
-      // biome-ignore lint/style/noNonNullAssertion: <explanation>
-      flightTimes.get(a)!.departureMs - flightTimes.get(b)!.departureMs,
-  );
+  const allItineraries: FlightItinerary[] = [
+    ...directFlights.map((f) => [f]),
+    ...connectingFlights,
+  ];
+  allItineraries.sort(compareItineraries);
 
   const elapsed = now() - startTs;
   console.log(
-    `[findFlights] end origin="${origin}" destination="${destination}" direct=${directFlights.length} connecting=${connectingFlights.length} evaluatedLegs=${evaluatedLegs} elapsedMs=${elapsed.toFixed(
+    `[findFlights] end origin="${origin}" destination="${destination}" itineraries=${allItineraries.length} evaluatedLegs=${evaluatedLegs} elapsedMs=${elapsed.toFixed(
       2,
     )}`,
   );
 
-  return {
-    direct: directFlights,
-    connecting: connectingFlights,
-  };
+  return allItineraries;
 }
